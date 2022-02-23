@@ -1,0 +1,255 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<ctime>
+#include<easyx.h>
+#include<graphics.h>
+
+#include"Barrier.h"
+
+#define w 25 //定义一小格宽度
+
+int find_bomb(vector<vector<int>>& v);//找到雷的真实数量并获得雷附近区域的数字
+
+									  
+									  
+//图片引入
+IMAGE s[9];
+IMAGE none;
+IMAGE flag; IMAGE bomb0; IMAGE bomb1;
+ExMessage exg;//获取鼠标的信息
+int iswin = 0;//判断是否胜利
+int total = 0;//判断未展开数与雷数关系
+int retry = 1;//判断是否继续游戏以及游戏的循环变量
+int n = 30;	//默认设置30 x 30大小，雷数为 9；可以任意设置大小
+void unflod(int x, int y, vector<vector<int>>& v, int& n);//展开地图
+
+//初始化图片的操作
+void initial_image() {
+	loadimage(&s[0], "./0.bmp", 25, 25);
+	loadimage(&s[1], "./1.bmp", 25, 25);
+	loadimage(&s[2], "./2.bmp", 25, 25);
+	loadimage(&s[3], "./3.bmp", 25, 25);
+	loadimage(&s[4], "./4.bmp", 25, 25);
+	loadimage(&s[5], "./5.bmp", 25, 25);
+	loadimage(&s[6], "./6.bmp", 25, 25);
+	loadimage(&s[7], "./7.bmp", 25, 25);
+	loadimage(&s[8], "./8.bmp", 25, 25);
+	loadimage(&flag, "./标记.bmp", 25, 25);
+	loadimage(&bomb0, "./雷0.bmp",25,25);
+	loadimage(&bomb1, "./雷1.bmp", 25, 25);
+	loadimage(&none, "./空.jpg",25,25);
+}
+int begin() {
+	initgraph(640, 480,SHOWCONSOLE);
+	setbkcolor(RGB(233, 240, 246));//设置背景颜色
+	cleardevice();
+	char s1[] = "开始游戏";
+	char s2[] = "退出游戏";
+	settextcolor(RGB(240, 0, 87));//设置文字颜色和背景
+	setbkmode(TRANSPARENT);
+	settextstyle(15, 0, "黑体");
+	outtextxy(0, 0, "游戏说明：");
+	outtextxy(0, 30, "左键单击：在判断出不是雷的方块上按下左键，可以打开该方块,");
+	outtextxy(0, 60, "如果方块上出现数字，则该数字表示其周围3×3区域中的地雷数.");
+	outtextxy(0, 90, "右键单击：在判断为地雷的方块上按下右键，可以标记地雷.");
+	fillrectangle(270, 150, 370, 200);
+	fillrectangle(270, 250, 370, 300);
+	int x1 = 270 + 50 - textwidth(s1) / 2;
+	int y1 = 150 + 25 - textheight(s1) / 2;
+	int x2 = 270 + 50 - textwidth(s2) / 2;
+	int y2 = 250 + 25 - textheight(s1) / 2;
+	outtextxy(x1, y1, s1);
+	outtextxy(x2, y2, s2);
+	while (1) {
+		if (peekmessage(&exg, EM_MOUSE)) {
+			if (exg.message == WM_LBUTTONDOWN) {
+				if (exg.x >= 270 && exg.x <= 370 && exg.y >= 150 && exg.y <= 200) {
+					cout << "请输入要挑战的行列数(注：不要超过屏幕大小）：" << endl;
+					cin >> n;
+					closegraph();
+					return 1;
+				}
+				else if (exg.x > 270 - 100 && exg.x <= 370 + 100 && exg.y >= 250 && exg.y <= 300) {
+					closegraph();
+					return 0;
+				}
+			}
+
+		}
+	}
+	
+}
+
+
+
+int main() {
+	char str[20];//输出雷的数量
+	int real_number = 0;  
+	int x = 0;//雷的位置
+	int y = 0;
+	HWND hnd = GetHWnd();//获得句柄，操作窗口
+	SetWindowText(hnd,"扫雷特定版");
+	while (retry != 0) {
+		srand((unsigned)time(NULL));
+		int number = rand() % n + n;//设置n~2n个雷,但是有可能相同
+		if (begin() == 1) {
+			initgraph(n * w, n * w + w, SHOWCONSOLE);
+			total = n * n;
+			cleardevice();
+			setbkcolor(RGB(233, 240, 246));
+			Barrier b(30, number);
+			settextstyle(15, 0, "黑体");
+			settextcolor(RED);
+			setbkmode(TRANSPARENT);
+
+			initial_image();
+			cleardevice();
+			BeginBatchDraw();
+			//随机放置雷
+			for (int i = 0; i < number; i++) {
+				x = rand() % n;
+				y = rand() % n;
+				b.v[x][y] = -1;
+			}
+			for (map<int, int>::iterator it = b.m.begin(); it != b.m.end(); it++) {
+				putimage((*it).first, (*it).second + w, &none);
+			}
+			real_number = find_bomb(b.v);//计算雷的实际数量，有可能随机放置时会重叠
+			sprintf_s(str, "%d", real_number);
+			outtextxy(n * 25 / 2 - 80, 0, "雷的数量为：");
+			outtextxy(n * 25 / 2 + 40, 0, str);
+			while (1) {
+				if (peekmessage(&exg, EM_MOUSE)) {
+					if (exg.message == WM_LBUTTONDOWN) {
+						int e_x = exg.x / 25;
+						int e_y = exg.y / 25;
+						if (b.v[e_x][e_y - 1] == -1) {
+							putimage(e_x * 25, e_y * 25, &bomb0);
+							FlushBatchDraw();
+							int isok = MessageBox(hnd, "你踩到雷啦，游戏失败", "提示", MB_RETRYCANCEL);
+							if (isok == IDRETRY) {
+								break;
+							}
+							else if (isok == IDCANCEL) {
+								retry = 0;
+								break;
+							}
+
+						}
+						else {
+							putimage(e_x * 25, e_y * 25, &s[b.v[e_x][e_y - 1]]);
+							unflod(e_x, e_y - 1, b.v, total);
+						}
+					}
+					else if (exg.message == WM_RBUTTONDOWN) {
+						putimage(exg.x / 25 * 25, exg.y / 25 * 25, &flag);
+						real_number--;
+					}
+
+				}
+
+				FlushBatchDraw();
+				if (total == real_number) {
+					retry = 0;
+					int isok = MessageBox(hnd, "恭喜你获胜了！", "提示", MB_OKCANCEL);
+					break;
+				}
+
+			}
+
+
+
+			EndBatchDraw();
+
+	
+			closegraph();
+		}
+		else {
+			return 0;
+		}
+	}
+
+
+
+
+	system("pause");
+
+	
+
+
+
+	return 0;
+
+}
+
+
+int find_bomb(vector<vector<int>>& v) {
+	int real_number = 0;
+	int size = v.size();
+	int size1 = v[0].size();
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size1; j++) {
+			if (v[i][j] == -1) {
+				real_number++;
+				if (j + 1 <= size1 ) {
+					if( v[i][j + 1] != -1) v[i][j + 1]++;
+					if (i + 1 < size && v[i + 1][j + 1] != -1) v[i + 1][j + 1]++;
+					if (i - 1 >= 0 && v[i - 1][j + 1] != -1) v[i - 1][j + 1]++;
+				}
+				if (j - 1 >= 0) 
+				{
+					if (v[i][j - 1] != -1) v[i][j - 1]++;
+					if (i + 1 < size && v[i + 1][j - 1] != -1) v[i + 1][j - 1]++;
+					if (i - 1 >= 0 && v[i - 1][j - 1] != -1) v[i - 1][j - 1]++;
+				}
+				if (i + 1 < size && v[i + 1][j] != -1) v[i + 1][j]++;
+				if (i - 1 >= 0 && v[i - 1][j] != -1) v[i - 1][j]++;
+			}
+		}
+	}
+
+	return real_number;
+
+}
+
+void unflod(int i,int j, vector<vector<int>>& v,int& n) {
+		if (j + 1 <= v.size()) {
+			if (v[i][j + 1] != -1) {
+				putimage(i * 25, (j + 2) * 25, &s[v[i][j + 1]]);
+				n--;
+			}
+
+			if (i + 1 < v.size() && v[i + 1][j + 1] != -1) {
+				putimage((i + 1) * 25, (j + 2) * 25, &s[v[i + 1][j + 1]]);
+				n--;
+			}
+			if (i - 1 >= 0 && v[i - 1][j + 1] != -1) {
+				putimage((i - 1) * 25, (j + 2) * 25, &s[v[i - 1][j + 1]]);
+				n--;
+			}
+		}
+		if (j - 1 >= 0)
+		{
+			if (v[i][j - 1] != -1) {
+				putimage(i * 25, (j) * 25, &s[v[i][j - 1]]);
+				n--;
+			}
+			if (i + 1 < v.size() && v[i + 1][j - 1] != -1) {
+				putimage((i + 1) * 25, (j) * 25, &s[v[i + 1][j - 1]]);
+				n--;
+			}
+			if (i - 1 >= 0 && v[i - 1][j - 1] != -1) {
+				putimage((i - 1) * 25, (j) * 25, &s[v[i - 1][j - 1]]);
+				n--;
+			}
+		}
+		if (i + 1 < v.size() && v[i + 1][j] != -1) {
+			putimage((i + 1) * 25, (j + 1) * 25, &s[v[i + 1][j]]);
+			n--;
+		}
+		if (i - 1 >= 0 && v[i - 1][j] != -1) {
+			putimage((i - 1) * 25, (j + 1) * 25, &s[v[i - 1][j]]);
+			n--;
+		}
+	
+}
