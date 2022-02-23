@@ -1,0 +1,644 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<easyx.h>
+#include<graphics.h>
+#include<ctime>
+#include<math.h>
+#include<conio.h>
+#include<mmsystem.h>
+
+#pragma comment(lib,"winmm.lib")
+
+#define WINDOW_W 1024 //游戏宽度
+#define WINDOW_H 680 //游戏高度
+#define mw 86 //我机参数
+#define mh 82
+#define aw 70 //敌机参数
+#define ah 70
+#define bossw 192 //Boss参数
+#define bossh 290
+//重生坐标
+#define APstart -ah-20
+//控制背景图移动
+int blood = 14; //Boss血量
+int is_boss = 0;//是否出现Boss
+int kill = 0; //击杀数量
+int dying = 0;//是否击中我方飞机
+char kills[20];
+char bloods[3];
+
+ExMessage exg;
+IMAGE MP[2]; IMAGE AP1[2]; IMAGE Boss[2]; IMAGE AP2[2];
+IMAGE bk; IMAGE bktaikong; IMAGE Gameover; IMAGE backcontrol;
+
+void addNode(); //增加我方子弹链表
+void addNode1(); //增加敌方子弹数
+void addNode2();
+void Boss_show();//Boss 登场
+int Died();  //判断我方飞机是否存活
+
+//二维数组给boss进行子弹设置
+//血量较少时设置光波线
+
+typedef struct Node
+{
+	int x;
+	int y;
+	struct Node* next;
+};
+//创建Bosss双子弹列表
+struct List
+{
+	Node* head1 = NULL;
+	Node* head2 = NULL;
+	Node* head3 = NULL;
+	Node* head4 = NULL;
+
+	Node* Last1 = NULL;
+	Node* Last2 = NULL;
+	Node* Last3 = NULL;
+	Node* Last4 = NULL;
+};
+void addNode_Boss(List* plist);
+
+DWORD b1, b2, b3, b4, b5, b6;
+DWORD b_ap1, b_ap2, b_boss, d1;
+Node* mp = NULL;
+Node* my_bullet = NULL;
+Node* ap1_bullet = NULL;
+Node* ap2_bullet = NULL;
+Node* boss_bullet = NULL;
+Node* ap1 = NULL;
+Node* ap2 = NULL;
+Node* Boss1 = NULL;
+
+
+
+
+//开始的游戏设置
+int Gamebegine() {
+	BeginBatchDraw();
+	int isbegine = 0;
+	setbkcolor(WHITE);
+	cleardevice();
+	char s1[] = "开始游戏";
+	char s2[] = "退出游戏";
+	char s3[] = "游戏说明";
+	setlinecolor(RED);
+	setfillcolor(LIGHTBLUE);
+	settextstyle(20, 0, "黑体");//设置文字格式
+	setbkmode(TRANSPARENT); //设置文字背景
+	while (isbegine!=1) {
+		
+		//开始游戏
+		fillrectangle(WINDOW_W / 2 - 100, 100, WINDOW_W / 2 + 100, 150);
+		int width1 = (200 - textwidth(s1)) / 2;
+		int height1 = (50 - textheight(s1)) / 2;
+		outtextxy(WINDOW_W / 2 - 100 + width1, 100 + height1, s1);
+		//退出游戏
+		fillrectangle(WINDOW_W / 2 - 100, 250, WINDOW_W / 2 + 100, 300);
+		int width2 = (200 - textwidth(s2)) / 2;
+		int height2 = (50 - textheight(s2)) / 2;
+		outtextxy(WINDOW_W / 2 - 100 + width2, 250 + height2, s2);
+		//游戏说明
+		fillrectangle(WINDOW_W / 2 - 100, 400, WINDOW_W / 2 + 100, 450);
+		int width3 = (200 - textwidth(s3)) / 2;
+		int height3 = (50 - textheight(s3)) / 2;
+		outtextxy(WINDOW_W / 2 - 100 + width3, 400 + height3, s3);
+		FlushBatchDraw();
+		if (peekmessage(&exg, EM_MOUSE)) {
+			if(exg.message== WM_LBUTTONDOWN)
+			{
+				if (exg.x >= WINDOW_W / 2 - 100 && exg.x <= WINDOW_W / 2 + 100 && exg.y >= 100 && exg.y <= 150) {
+					isbegine = 1;
+				}
+				else if (exg.x >= WINDOW_W / 2 - 100 && exg.x <= WINDOW_W / 2 + 100 && exg.y >= 250 && exg.y <= 300) {
+					isbegine = 0;
+					break;
+				}
+				else if (exg.x >= WINDOW_W / 2 - 100 && exg.x <= WINDOW_W / 2 + 100 && exg.y >= 400 && exg.y <= 450)
+				{
+					isbegine = -1;
+					loadimage(&backcontrol, "./backcontrol.jpg",WINDOW_W,WINDOW_H);
+					putimage(0, 0, &backcontrol);
+					system("pause");
+				}
+			}
+			EndBatchDraw();
+			cleardevice();
+		}
+	}
+
+	return isbegine;
+}
+
+void Init_image() {
+	mciSendString("open D:\\PR\\年终总结\\别再想见我.mp3 alias BGM", 0, 0, 0);
+	mciSendString("play BGM repeat", 0, 0, 0);
+	//我方飞机载入
+	loadimage(&MP[0], "./mp.JPG", mw, mh);
+	loadimage(&MP[1], "./mp1.jpg", mw, mh);
+	//敌方飞机载入
+	loadimage(&AP1[0], "./AP.jpg", aw, ah);
+	loadimage(&AP1[1], "./APS.jpg", aw, ah);
+	loadimage(&AP2[0], "./AP.jpg", aw, ah);
+	loadimage(&AP2[1], "./APS.jpg", aw, ah);
+	//Boss
+	loadimage(&Boss[0], "./boss1_1.jpg");
+	loadimage(&Boss[1], "./boss1_1S.jpg");
+	//总背景
+	loadimage(&bk, "./bk.jpg", WINDOW_W, WINDOW_H);
+	//游戏背景
+	loadimage(&bktaikong, "./backtaikong.jpg",WINDOW_W, WINDOW_H);
+	loadimage(&Gameover, "./Gameover.jpg", WINDOW_W, WINDOW_H);
+
+}
+void Init_Plane()
+{
+	srand((unsigned)time(NULL));
+	//创建飞机
+	mp = (Node*)malloc(sizeof(Node));
+	mp->x = WINDOW_W / 2 - mw / 2;
+	mp->y = WINDOW_H - 100;
+	mp->next = NULL;
+	//创建子弹
+	my_bullet = (Node*)malloc(sizeof(Node));
+	my_bullet->next = NULL;
+	b1 = GetTickCount();
+	//敌方
+	ap1_bullet = (Node*)malloc(sizeof(Node));
+	ap1_bullet->next = NULL;
+	ap2_bullet = (Node*)malloc(sizeof(Node));
+	ap2_bullet->next = NULL;
+	b_ap1 = GetTickCount();
+	//boss
+	boss_bullet = (Node*)malloc(sizeof(Node));
+	boss_bullet->next = NULL;
+	b_boss = GetTickCount();
+
+	//创建敌方飞机
+	ap1 = (Node*)malloc(sizeof(Node));
+	ap1->x = rand() % (WINDOW_W - aw);
+	ap1->y = APstart;
+	ap1->next = NULL;
+	b3 = GetTickCount();
+
+	ap2 = (Node*)malloc(sizeof(Node));
+	ap2->x = rand() % (WINDOW_W  - aw );
+	ap2->y = -350;
+	ap2->next = NULL;
+	b5 = GetTickCount();
+	//Boss初始化
+	Boss1 = (Node*)malloc(sizeof(Node));
+	Boss1->next = NULL;
+	Boss1->x = WINDOW_W / 2 - 90;
+	Boss1->y = 0;
+}
+void CreatPlane();
+void Control();
+
+
+int main() {
+	initgraph(WINDOW_W, WINDOW_H);
+	HWND hnd = GetHWnd();
+	SetWindowText(hnd, "飞机大战");
+	struct List list;
+	if (Gamebegine()) {
+		Init_image();
+		Init_Plane();
+		BeginBatchDraw();
+		while (dying!=1) {
+			putimage(0, 0, &bktaikong);
+			CreatPlane();
+			b2 = GetTickCount();
+			if (b2 - b1 >= 600) {
+				addNode();
+				b1 = b2;
+			}
+			b_ap2 = GetTickCount();
+			if (b_ap2 - b_ap1 >= 1200) {
+				addNode1();
+				addNode2();
+				b_ap1 = b_ap2;
+			}
+			//设置BOSS攻击时间
+			d1 = GetTickCount();
+			//根据血量改变攻击速度
+			if (blood > 9) {
+				if (d1 - b_boss >= 2400) {
+					addNode_Boss(&list);
+					b_boss = d1;
+				}
+			}
+			else {
+				if (d1 - b_boss >= 1200) {
+					addNode_Boss(&list);
+					b_boss = d1;
+				}
+			}
+			
+			if (my_bullet->next != NULL) {
+				Node* P = my_bullet->next;
+				Node* attack_P1 = ap1_bullet->next;
+				Node* attack_P2 = ap2_bullet->next;
+				Node* attack_Boss1 = list.head1;
+				Node* attack_Boss2 = list.head2;
+				Node* attack_Boss3 = list.head3;
+				Node* attack_Boss4= list.head4;
+				setfillcolor(RED);
+				int mid;
+				while (P != NULL) {
+					if (is_boss == 0) {
+						if ((P->y - ap1->y) <= ah && (P->y - ap1->y) >= 0 && (P->x - ap1->x) >= -3 && (P->x - ap1->x) <= aw - 7) {
+							ap1->y = APstart;
+							P->y = APstart - 100;
+							P = P->next;
+							PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+							kill++;
+							while (1) {
+								mid = rand() % (WINDOW_W - aw);
+								if (abs(mid - ap1->x) > aw) {
+									ap1->x = mid;
+									break;
+								}
+							}
+						}
+						else if ((P->y - ap2->y) <= ah && (P->y - ap2->y) >= 0 && (P->x - ap2->x) >= -3 && (P->x - ap2->x) <= aw - 7) {
+							P->y = APstart - 100;
+							ap2->y = APstart;
+							P = P->next;
+							PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+							kill++;
+							while (1) {
+								mid = rand() % (WINDOW_W - aw);
+								if (abs(mid - ap2->x) > aw) {
+									ap2->x = mid;
+									break;
+								}
+							}
+						}
+						else {
+							fillroundrect(P->x, P->y, P->x + 10, P->y + 35, 10, 30);
+							P->y -= 5;
+							P = P->next;
+						}
+						//设置敌方飞机的攻击
+						while (attack_P1 != NULL && attack_P2 != NULL) {
+							setfillcolor(BLUE);
+
+							if ((mp->y - attack_P1->y) <= 35 && (mp->y - attack_P1->y) >= 0 && (attack_P1->x - mp->x) >= -3 && (attack_P1->x - mp->x) <= mw - 7) {
+								attack_P1 = NULL;
+								PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+								dying = 1;
+								break;
+							}
+							if ((mp->y - attack_P2->y) <= 35 && (mp->y - attack_P2->y) >= 0 && (attack_P2->x - mp->x) >= -3 && (attack_P2->x - mp->x) <= mw - 7) {
+								attack_P2 = NULL;
+								PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+								dying = 1;
+								break;
+							}
+							else {
+								fillroundrect(attack_P1->x, attack_P1->y, attack_P1->x + 10, attack_P1->y - 35, 10, 30);
+								attack_P1->y += 5;
+								attack_P1 = attack_P1->next;
+								fillroundrect(attack_P2->x, attack_P2->y, attack_P2->x + 10, attack_P2->y - 35, 10, 30);
+								attack_P2->y += 5;
+								attack_P2 = attack_P2->next;
+							}
+						}
+					
+					}
+					else //Boss 出现
+					{
+						if ((P->y - Boss1->y) <= bossh && (P->y - Boss1->y) >= 0 && (P->x - Boss1->x) >= -3 && (P->x - Boss1->x) <= bossw - 7)
+						{
+							P->y = APstart - 100;
+							blood--;
+							PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+							P = P->next;
+						}
+						else {
+							fillroundrect(P->x, P->y, P->x + 10, P->y + 35, 10, 30);
+							P->y -= 5;
+							P = P->next;
+						}
+						while (attack_Boss1 != NULL && attack_Boss2 != NULL && attack_Boss3 != NULL && attack_Boss4 != NULL) {
+							setfillcolor(GREEN);
+							if ((mp->y - attack_Boss1->y) <= 35 && (mp->y - attack_Boss1->y) >= 0 && (attack_Boss1->x - mp->x) >= -3 && (attack_Boss1->x - mp->x) <= mw - 7) {
+
+								attack_Boss1 = NULL;
+								PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+								dying = 1;
+								break;
+							}
+							else if ((mp->y - attack_Boss2->y) <= 35 && (mp->y - attack_Boss2->y) >= 0 && (attack_Boss2->x - mp->x) >= -3 && (attack_Boss2->x - mp->x) <= mw - 7) {
+								attack_Boss2 = NULL;
+								PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+								dying = 1;
+								break;
+							}
+							else if ((mp->y - attack_Boss3->y) <= 35 && (mp->y - attack_Boss3->y) >= 0 && (attack_Boss3->x - mp->x) >= -3 && (attack_Boss3->x - mp->x) <= mw - 7) {
+
+								attack_Boss3 = NULL;
+								PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+								dying = 1;
+								break;
+							}
+							else if ((mp->y - attack_Boss4->y) <= 35 && (mp->y - attack_Boss4->y) >= 0 && (attack_Boss4->x - mp->x) >= -3 && (attack_Boss4->x - mp->x) <= mw - 7) {
+								attack_Boss4 = NULL;
+								PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+								dying = 1;
+								break;
+							}
+							else {
+								fillroundrect(attack_Boss1->x, attack_Boss1->y, attack_Boss1->x + 10, attack_Boss1->y - 35, 10, 30);
+								attack_Boss1->y += 5;
+								attack_Boss1 = attack_Boss1->next;
+								fillroundrect(attack_Boss2->x, attack_Boss2->y, attack_Boss2->x + 10, attack_Boss2->y - 35, 10, 30);
+								attack_Boss2->y += 5;
+								attack_Boss2 = attack_Boss2->next;
+								fillcircle(attack_Boss3->x, attack_Boss3->y, 17);
+								attack_Boss3->y += 5;
+								attack_Boss3->x -= 5;
+								attack_Boss3 = attack_Boss3->next;
+								fillcircle(attack_Boss4->x, attack_Boss4->y, 17);
+								attack_Boss4->y += 5;
+								attack_Boss4->x += 5;
+								attack_Boss4 = attack_Boss4->next;
+							}
+							if (blood <=4) {
+								setlinecolor(0xFF0000);//设置深蓝色线
+								setlinestyle(PS_DASH);//设置虚线大招
+								line(Boss1->x + bossw/2 - 45, bossh + Boss1->y-5, Boss1->x + bossw / 2 - 45, WINDOW_H);
+								line(Boss1->x + bossw/2 + 4, bossh + Boss1->y-5, Boss1->x + bossw / 2 + 4
+									, WINDOW_H);
+								if (mp->x > Boss1->x + bossw / 2 - 54 && mp->x < Boss1->x + bossw / 2 + 13) {
+									PlaySound("./Beam.wav", NULL, SND_FILENAME | SND_ASYNC);
+									dying = 1;
+									break;
+								}
+							}
+						}
+
+						
+							
+								
+							
+						
+					
+				    }
+
+
+				}
+				
+			}
+
+			//敌机1飞行速度控制
+			b4 = GetTickCount();
+			int x1 = rand() % 4;//随机增加飞机的横移速度，增加游戏难度
+			int x2 = rand() % 4;
+			if (b4 - b3 >= 50) {
+				if (ap1->y <= WINDOW_H) {
+					ap1->y += 3;
+				}
+				else
+				{
+					ap1->y = 0;
+					ap1->x = rand() % (WINDOW_W - aw);
+				}
+				if (ap1->x <= WINDOW_W-aw ) {
+					ap1->x += x1;
+				}
+				b3 = b4;
+			}
+			//敌机2飞行速度控制
+			b6 = GetTickCount();
+			if (b6 - b5 >= 50) {
+				if (ap2->y <= WINDOW_H) {
+					ap2->y += 3;
+				}
+				else
+				{
+					ap2->y = 0;
+					ap2->x = rand() % (WINDOW_W - aw);
+				}
+				if (ap2->x >= 0) {
+					ap2->x -= x2;
+				}
+				b5 = b6;
+			}
+
+			if (is_boss) {
+				sprintf_s(bloods, "%d", blood);
+				outtextxy(0, 0, "BossHP：");
+				outtextxy(100, 0, bloods);
+			}
+			else
+			{
+				sprintf_s(kills, "%d", kill);
+				outtextxy(0, 0, "击杀数量：");
+				outtextxy(100, 0, kills);
+			}
+
+			if (kill >= 10 && blood > 0)
+			{
+				is_boss = 1;
+				Boss_show();
+			}
+			else {
+				is_boss = 0;
+			}
+			if (blood == 0) break;
+			FlushBatchDraw();
+			Sleep(15);
+
+
+			if (Died()) break;
+
+			Control();
+
+		}
+	}
+	else {
+	cleardevice();
+	settextstyle(50, 0, "黑体");
+	setlinecolor(RED);
+	outtextxy(0, 0,"退出游戏,按任意键结束！");
+}
+	
+
+if (blood > 0) {
+	Sleep(300);
+	putimage(0, 0, &Gameover);
+	system("pause");
+	EndBatchDraw();
+}
+else {
+	int isok = MessageBox(hnd, "恭喜，你成功通关了游戏!!", "提示", MB_OKCANCEL);
+	//if (isok == IDOK) {
+	//	printf("you hit ok");
+	//}
+	//else if (isok == IDCANCEL) {
+	//	printf("you hit cancel");
+	//}
+}
+	
+	//释放开辟的空间
+	free(mp);
+	free(ap1);
+	free(ap2);
+	free(Boss1);
+	free(my_bullet);
+	free(ap1_bullet);
+	free(ap2_bullet);
+	free(boss_bullet);
+	closegraph();
+	return 0;
+}
+
+
+void CreatPlane() {
+	putimage(mp->x, mp->y, &MP[1], NOTSRCERASE);
+	putimage(mp->x, mp->y, &MP[0], SRCINVERT);
+	putimage(ap1->x, ap1->y, &AP1[1], NOTSRCERASE);
+	putimage(ap1->x, ap1->y, &AP1[0], SRCINVERT);
+	putimage(ap2->x, ap2->y, &AP2[1], NOTSRCERASE);
+	putimage(ap2->x, ap2->y, &AP2[0], SRCINVERT);
+}
+void addNode()
+{
+	Node* p_new = (Node*)malloc(sizeof(Node));
+	p_new->x = mp->x + 35;
+	p_new->y = mp->y - 45;
+	p_new->next = my_bullet->next;
+	my_bullet->next = p_new;
+}
+void addNode1()
+{
+	Node* p_new = (Node*)malloc(sizeof(Node));
+	p_new->x = ap1->x + 30;
+	p_new->y = ap1->y + 115;
+	p_new->next = ap1_bullet->next;
+	ap1_bullet->next = p_new;
+}
+void addNode2()
+{
+	Node* p_new = (Node*)malloc(sizeof(Node));
+	p_new->x = ap2->x + 30;
+	p_new->y = ap2->y + 115;
+	p_new->next = ap2_bullet->next;
+	ap2_bullet->next = p_new;
+}
+void addNode_Boss(List* plist) {
+	Node* p_new1 = (Node*)malloc(sizeof(Node));
+	Node* p_new2 = (Node*)malloc(sizeof(Node));
+	Node* p_new3 = (Node*)malloc(sizeof(Node));
+	Node* p_new4 = (Node*)malloc(sizeof(Node));
+	p_new1->x = Boss1->x + 30;
+	p_new1->y = Boss1->y + bossh + 35;
+	p_new1->next = NULL;
+	p_new2->x = Boss1->x + 100;
+	p_new2->y = Boss1->y + bossh + 35;
+	p_new2->next = NULL;
+	p_new3->x = Boss1->x + 10;
+	p_new3->y = Boss1->y + bossh - 35;
+	p_new3->next = NULL;
+	p_new4->x = Boss1->x + 120;
+	p_new4->y = Boss1->y + bossh - 35;
+	p_new4->next = NULL;
+	//利用链表设置四个子弹
+	plist->Last1 = plist->head1;
+	plist->Last2 = plist->head2;
+	plist->Last3 = plist->head3;
+	plist->Last4 = plist->head4;
+	if (plist->Last1) {
+		while (plist->Last1->next) {
+			plist->Last1 = plist->Last1->next;
+		}
+		plist->Last1->next = p_new1;
+	}
+	else {
+		plist->head1 = p_new1;
+	}
+
+	if (plist->Last2) {
+		while (plist->Last2->next) {
+			plist->Last2 = plist->Last2->next;
+		}
+		plist->Last2->next = p_new2;
+	}
+	else {
+		plist->head2 = p_new2;
+	}
+	if (plist->Last3) {
+		while (plist->Last3->next) {
+			plist->Last3 = plist->Last3->next;
+		}
+		plist->Last3->next = p_new3;
+	}
+	else {
+		plist->head3 = p_new3;
+	}
+	if (plist->Last4) {
+		while (plist->Last4->next) {
+			plist->Last4 = plist->Last4->next;
+		}
+		plist->Last4->next = p_new4;
+	}
+	else {
+		plist->head4 = p_new4;
+	}
+}
+
+
+
+
+
+void Control()
+{
+
+	if (GetAsyncKeyState(VK_UP)) {
+		mp->y -= 5;
+	}
+	if (GetAsyncKeyState(VK_DOWN)) {
+		mp->y += 5;
+	}
+	if (GetAsyncKeyState(VK_LEFT)) {
+		mp->x -= 5;
+	}
+	if (GetAsyncKeyState(VK_RIGHT)) {
+		mp->x += 5;
+	}
+	if (mp->x >= WINDOW_W - mw) {
+		mp->x = WINDOW_W - mw;
+	}
+	if (mp->x <= 0) {
+		mp->x = 0;
+	}
+	if (mp->y >= WINDOW_H - mh) {
+		mp->y = WINDOW_H - mh;
+	}
+	if (mp->y <= 0) {
+		mp->y = 0;
+	}
+}
+void Boss_show() {
+	ap1->y = APstart;
+	ap2->y = APstart;
+	putimage(Boss1->x-20, 0, &Boss[1], NOTSRCERASE);
+	putimage(Boss1->x-20, 0, &Boss[0], SRCINVERT);
+}
+int Died() {
+	int ishere = 0;
+	if ((mp->y - ap1->y) <= ah-3 && (mp->y - ap1->y) >= 0 && (mp->x - ap1->x) >= 0 && (mp->x - ap1->x) <= aw - 3) {
+		ishere = 1;
+	}
+	else if ((mp->y - ap2->y) <= ah-3 && (mp->y - ap2->y) >= 0 && (mp->x - ap2->x) >= 0 &&( mp->x - ap2->x) <= aw - 3) {
+		ishere = 1;
+	}
+	else if ((mp->y - Boss1->y) <= bossh-3 && (mp->y - Boss1->y >= 0) && (mp->x - Boss1->x) >= 0 && (mp->x - Boss1->x) <= bossw - 3) {
+		ishere = 1;
+	}
+	return ishere;
+}
